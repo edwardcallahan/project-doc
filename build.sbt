@@ -1,6 +1,6 @@
 // General
 
-name := "project-doc"
+name := "project-doc-docker"
 version := "1.0-SNAPSHOT"
 scalaVersion := "2.11.8"
 
@@ -34,31 +34,50 @@ StylusKeys.compress in Assets := false
 
 // ConductR
 import ByteConversions._
+import com.typesafe.sbt.packager.docker._
 
 javaOptions in Universal := Seq(
   "-J-Xmx64m",
   "-J-Xms64m"
 )
 
-BundleKeys.nrOfCpus := 1.0
+BundleKeys.bundleType := Docker
+
+BundleKeys.nrOfCpus := 0.1
 BundleKeys.memory := 128.MiB
 BundleKeys.diskSpace := 50.MiB
-BundleKeys.roles := Set("web-doc")
+BundleKeys.roles := Set("web")
 
 BundleKeys.system := "doc-renderer-cluster"
 BundleKeys.systemVersion := "2"
 
 BundleKeys.endpoints := Map(
   "akka-remote" -> Endpoint("tcp"),
-  "web" -> Endpoint("http", services = Set(URI("http://conductr.lightbend.com")))
+  "web" -> Endpoint("http", services = Set(URI("http://conductr-docker.lightbend.com")))
 )
 
 // Bundle publishing configuration
 
 inConfig(Bundle)(Seq(
-  bintrayVcsUrl := Some("https://github.com/typesafehub/project-doc"),
+  bintrayVcsUrl := Some("https://github.com/typesafehub/project-doc-docker"),
   bintrayOrganization := Some("typesafe")
 ))
 
 // Project/module declarations
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
+
+// Docker specifics for the native packager
+
+dockerCommands := Seq(
+  Cmd("FROM", "typesafe-docker-internal-docker.bintray.io/typesafehub/docker-java8-portal-base")
+  )
+// Additional args for the docker run can be supplied here (see the sbt-bundle
+// README) - otherwise the startCommand is empty
+
+BundleKeys.startCommand := Seq.empty
+
+// The following check creates a bundle component that waits for the
+// Docker build to complete and then test the postgres-bdr port. If
+// the port is open then ConductR is signalled that the bundle is ready.
+
+BundleKeys.checks := Seq(uri("docker+$WEB_HOST"))
